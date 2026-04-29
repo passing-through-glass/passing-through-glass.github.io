@@ -1,6 +1,405 @@
-<!-- ONLY showing changed JS parts to keep this usable on phone -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>shīru's corner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,600&family=Courier+Prime:ital,wght@0,400;1,400&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #0d0b0f;
+      --surface: #14111a;
+      --surface2: #1d1826;
+      --border: #2e2840;
+      --text: #e8e0f0;
+      --muted: #7a6e8a;
+      --accent: #c9a96e;
+      --accent2: #9b6fa8;
+      --accent3: #6faaa8;
+      --danger: #a85050;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier Prime', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.4;
+    }
+    header {
+      text-align: center;
+      padding: 4rem 2rem 2rem;
+    }
+    .site-title {
+      font-family: 'IM Fell English', serif;
+      font-size: clamp(2.4rem, 7vw, 5rem);
+      color: var(--text);
+      letter-spacing: 0.04em;
+      font-style: italic;
+      line-height: 1;
+    }
+    .site-title span { color: var(--accent); }
+    .site-subtitle {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      margin-top: 0.7rem;
+    }
+    .divider {
+      width: 120px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      margin: 1.5rem auto;
+    }
+    .notify-bar { text-align: center; margin-bottom: 1rem; }
+    .notify-btn {
+      background: transparent;
+      border: 1px solid var(--accent2);
+      color: var(--accent2);
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 0.5rem 1.4rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border-radius: 2px;
+    }
+    .notify-btn:hover { background: var(--accent2); color: var(--bg); }
+    .notify-btn.subscribed { border-color: var(--accent3); color: var(--accent3); }
+    .notify-btn.subscribed:hover { background: var(--accent3); color: var(--bg); }
+    main {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 1rem 2rem 6rem;
+    }
+    .loading-state {
+      text-align: center;
+      color: var(--muted);
+      padding: 4rem 0;
+      font-style: italic;
+      font-family: 'IM Fell English', serif;
+      font-size: 1rem;
+    }
+    .dot { display: inline-block; animation: blink 1.4s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink {
+      0%, 80%, 100% { opacity: 0; }
+      40% { opacity: 1; }
+    }
+    .empty-state {
+      text-align: center;
+      color: var(--muted);
+      font-style: italic;
+      padding: 4rem 0;
+      font-family: 'IM Fell English', serif;
+      font-size: 1.1rem;
+      display: none;
+    }
+    .post-card {
+      border-left: 2px solid var(--border);
+      padding: 2rem 0 2rem 1.8rem;
+      margin-bottom: 0.5rem;
+      position: relative;
+      transition: border-color 0.3s;
+      animation: fadeIn 0.6s ease both;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .post-card:hover { border-color: var(--accent); }
+    .post-card::before {
+      content: '✦';
+      position: absolute;
+      left: -0.62rem;
+      top: 2rem;
+      color: var(--accent);
+      font-size: 0.7rem;
+      background: var(--bg);
+      padding: 2px 0;
+    }
+    .post-date {
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+    .post-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.35rem;
+      font-weight: 400;
+      color: var(--text);
+      margin-bottom: 1rem;
+      font-style: italic;
+    }
+    .post-body {
+      font-size: 0.92rem;
+      line-height: 1.9;
+      color: #c4bcd4;
+      white-space: pre-wrap;
+    }
+    .post-tag {
+      display: inline-block;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      color: var(--accent2);
+      border: 1px solid var(--accent2);
+      padding: 0.15rem 0.5rem;
+      margin-top: 1rem;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+    .post-tag.update { color: var(--accent3); border-color: var(--accent3); }
+    .post-tag.fragment { color: var(--accent); border-color: var(--accent); }
+    .post-separator {
+      height: 1px;
+      background: linear-gradient(90deg, var(--border), transparent);
+      margin: 0 0 0 1.8rem;
+    }
+    .delete-btn {
+      font-size: 0.65rem;
+      color: var(--muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'Courier Prime', monospace;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0;
+      margin-top: 0.8rem;
+      display: block;
+      transition: color 0.2s;
+    }
+    .delete-btn:hover { color: var(--danger); }
+    .admin-toggle {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.3s;
+      z-index: 100;
+    }
+    .admin-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    .admin-toggle.logged-in { border-color: var(--accent); color: var(--accent); }
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 200;
+      backdrop-filter: blur(5px);
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .overlay.active { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2rem;
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: modalIn 0.3s ease;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.96) translateY(10px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-title {
+      font-family: 'IM Fell English', serif;
+      font-size: 1.4rem;
+      font-style: italic;
+      color: var(--accent);
+      margin-bottom: 1.5rem;
+    }
+    label {
+      display: block;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      margin-top: 1.2rem;
+    }
+    input[type="text"],
+    input[type="password"],
+    input[type="email"],
+    textarea,
+    select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.9rem;
+      padding: 0.6rem 0.8rem;
+      outline: none;
+      transition: border-color 0.2s;
+      border-radius: 2px;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 200px; }
+    select option { background: var(--surface2); }
+    .btn-row {
+      display: flex;
+      gap: 0.8rem;
+      margin-top: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .btn {
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.55rem 1.2rem;
+      border: 1px solid;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-radius: 2px;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+    .btn-primary:hover:not(:disabled) { opacity: 0.85; }
+    .btn-ghost { background: transparent; border-color: var(--border); color: var(--muted); }
+    .btn-ghost:hover { border-color: var(--muted); color: var(--text); }
+    .btn-danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+    .btn-danger:hover { background: var(--danger); color: var(--text); }
+    .error-msg {
+      font-size: 0.78rem;
+      color: var(--danger);
+      margin-top: 0.6rem;
+      min-height: 1rem;
+    }
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface2);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.8rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: 2px;
+      z-index: 500;
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="site-title">shīru<span>'s</span> corner</div>
+  <div class="site-subtitle">poetry &amp; thoughts &amp; whatever else</div>
+  <div class="divider"></div>
+</header>
+
+<div class="notify-bar">
+  <button class="notify-btn" id="notifyBtn" onclick="toggleNotifications()">
+    ✦ notify me when something new appears
+  </button>
+</div>
+
+<main id="feed">
+  <div class="loading-state" id="loadingState">
+    loading<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+  </div>
+  <div class="empty-state" id="emptyState">
+    nothing here yet.<br>the silence is part of the poem.
+  </div>
+</main>
+
+<button class="admin-toggle" id="adminFab" title="admin" onclick="handleFabClick()">⌘</button>
+
+<!-- Login modal -->
+<div class="overlay" id="loginOverlay">
+  <div class="modal">
+    <div class="modal-title">who goes there?</div>
+    <label>email</label>
+    <input type="email" id="loginEmail" placeholder="your@email.com" />
+    <label>password</label>
+    <input type="password" id="loginPassword" placeholder="···"
+      onkeydown="if(event.key==='Enter') login()" />
+    <div class="error-msg" id="loginError"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="loginBtn" onclick="login()">enter →</button>
+      <button class="btn btn-ghost" onclick="closeOverlay('loginOverlay')">nevermind</button>
+    </div>
+  </div>
+</div>
+
+<!-- Write modal -->
+<div class="overlay" id="adminOverlay">
+  <div class="modal">
+    <div class="modal-title">write something.</div>
+    <label>type</label>
+    <select id="postType">
+      <option value="poem">poem</option>
+      <option value="update">update</option>
+      <option value="fragment">fragment</option>
+    </select>
+    <label>title <span style="color:var(--muted);font-size:0.65rem">(optional)</span></label>
+    <input type="text" id="postTitle" placeholder="untitled" />
+    <label>content</label>
+    <textarea id="postContent" placeholder="write here..."></textarea>
+    <div class="error-msg" id="postError"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="publishBtn" onclick="publishPost()">publish ✦</button>
+      <button class="btn btn-ghost" onclick="closeOverlay('adminOverlay')">close</button>
+      <button class="btn btn-danger" onclick="logout()">sign out</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  }
+</script>
+
+<script>
+  // ══════════════════════════════════════════════
+  //  🔧 PASTE YOUR SUPABASE DETAILS HERE
+  // ══════════════════════════════════════════════
+  const SUPABASE_URL      = 'YOUR_SUPABASE_URL';
+  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+  // ══════════════════════════════════════════════
+
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let currentUser = null;
+
   // ── INIT ─────────────────────────────────────
   async function init() {
     const { data: { session } } = await db.auth.getSession();
@@ -9,13 +408,12 @@
     await loadPosts();
     updateNotifyBtn();
 
+    // realtime: new post
     db.channel('posts-channel')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, ({ new: post }) => {
         document.getElementById('emptyState').style.display = 'none';
         prependCard(post);
-
-        const type = post.post_type || post.type;
-        sendLocalNotification(post.title || ('new ' + type), post.content);
+        sendLocalNotification(post.title || ('new ' + post.post_type), post.content);
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, ({ old: post }) => {
         document.getElementById('post-' + post.id)?.remove();
@@ -24,17 +422,189 @@
       .subscribe();
   }
 
+  // ── LOAD POSTS ────────────────────────────────
+  async function loadPosts() {
+    const { data, error } = await db
+      .from('posts')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    document.getElementById('loadingState').style.display = 'none';
+
+    if (error || !data || data.length === 0) {
+      document.getElementById('emptyState').style.display = 'block';
+      return;
+    }
+
+    data.forEach((post, i) => appendCard(post, i));
+  }
+
   // ── BUILD CARD ────────────────────────────────
   function makeCard(post, delay = 0) {
-    const type = post.post_type || post.type;
-
     const card = document.createElement('div');
     card.className = 'post-card';
     card.id = 'post-' + post.id;
     card.style.animationDelay = (delay * 0.08) + 's';
-
     const date = new Date(post.created_at).toLocaleDateString('en-GB', {
       day: 'numeric', month: 'long', year: 'numeric'
+    });
+    card.innerHTML = `
+      <div class="post-date">${date}</div>
+      ${post.title ? `<div class="post-title">${esc(post.title)}</div>` : ''}
+      <div class="post-body">${esc(post.content)}</div>
+      <span class="post-tag ${post.post_type}">${post.post_type}</span>
+      ${currentUser ? `<button class="delete-btn" onclick="deletePost('${post.id}')">× delete</button>` : ''}
+    `;
+    return card;
+  }
+
+  function appendCard(post, i) {
+    const feed = document.getElementById('feed');
+    const existing = feed.querySelectorAll('.post-card');
+    if (existing.length > 0) {
+      const sep = document.createElement('div');
+      sep.className = 'post-separator';
+      feed.appendChild(sep);
+    }
+    feed.appendChild(makeCard(post, i));
+  }
+
+  function prependCard(post) {
+    const feed = document.getElementById('feed');
+    const firstCard = feed.querySelector('.post-card');
+    const card = makeCard(post, 0);
+    if (firstCard) {
+      const sep = document.createElement('div');
+      sep.className = 'post-separator';
+      feed.insertBefore(sep, firstCard);
+      feed.insertBefore(card, sep);
+    } else {
+      feed.appendChild(card);
+    }
+  }
+
+  function checkEmpty() {
+    const has = document.querySelector('.post-card');
+    document.getElementById('emptyState').style.display = has ? 'none' : 'block';
+  }
+
+  // ── AUTH ──────────────────────────────────────
+  function handleFabClick() {
+    if (currentUser) {
+      document.getElementById('adminOverlay').classList.add('active');
+    } else {
+      document.getElementById('loginEmail').value = '';
+      document.getElementById('loginPassword').value = '';
+      document.getElementById('loginError').textContent = '';
+      document.getElementById('loginOverlay').classList.add('active');
+      setTimeout(() => document.getElementById('loginEmail').focus(), 100);
+    }
+  }
+
+  async function login() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass  = document.getElementById('loginPassword').value;
+    const btn   = document.getElementById('loginBtn');
+    document.getElementById('loginError').textContent = '';
+    btn.disabled = true; btn.textContent = 'entering...';
+
+    const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
+    btn.disabled = false; btn.textContent = 'enter →';
+
+    if (error) {
+      document.getElementById('loginError').textContent = 'wrong credentials, try again.';
+      return;
+    }
+    currentUser = data.user;
+    closeOverlay('loginOverlay');
+    updateFab();
+    refreshFeed();
+    document.getElementById('adminOverlay').classList.add('active');
+    showToast('welcome back ✦');
+  }
+
+  async function logout() {
+    await db.auth.signOut();
+    currentUser = null;
+    closeOverlay('adminOverlay');
+    updateFab();
+    refreshFeed();
+    showToast('signed out.');
+  }
+
+  function updateFab() {
+    document.getElementById('adminFab').classList.toggle('logged-in', !!currentUser);
+  }
+
+  function refreshFeed() {
+    document.querySelectorAll('.post-card, .post-separator').forEach(el => el.remove());
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('loadingState').style.display = 'block';
+    loadPosts();
+  }
+
+  // ── PUBLISH ───────────────────────────────────
+  async function publishPost() {
+    const title   = document.getElementById('postTitle').value.trim();
+    const content = document.getElementById('postContent').value.trim();
+    const type    = document.getElementById('postType').value;
+    const btn     = document.getElementById('publishBtn');
+    document.getElementById('postError').textContent = '';
+
+    if (!content) {
+      document.getElementById('postError').textContent = 'write something first...';
+      return;
+    }
+
+    btn.disabled = true; btn.textContent = 'publishing...';
+    const { error } = await db.from('posts').insert([{ title, content, post_type: type }]);
+    btn.disabled = false; btn.textContent = 'publish ✦';
+
+    if (error) {
+      document.getElementById('postError').textContent = 'error: ' + error.message;
+      return;
+    }
+
+    document.getElementById('postTitle').value = '';
+    document.getElementById('postContent').value = '';
+    closeOverlay('adminOverlay');
+    showToast('posted ✦');
+  }
+
+  // ── DELETE ────────────────────────────────────
+  async function deletePost(id) {
+    if (!confirm('delete this post?')) return;
+    const { error } = await db.from('posts').delete().eq('id', id);
+    if (error) { showToast('couldn\'t delete 😔'); return; }
+    document.getElementById('post-' + id)?.remove();
+    checkEmpty();
+    showToast('deleted.');
+  }
+
+  // ── OVERLAY HELPERS ───────────────────────────
+  function closeOverlay(id) {
+    document.getElementById(id).classList.remove('active');
+  }
+  document.querySelectorAll('.overlay').forEach(o => {
+    o.addEventListener('click', e => { if (e.target === o) o.classList.remove('active'); });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape')
+      document.querySelectorAll('.overlay.active').forEach(o => o.classList.remove('active'));
+  });
+
+  // ── NOTIFICATIONS ─────────────────────────────
+  async function toggleNotifications() {
+    if (!('Notification' in window)) { showToast('browser doesn\'t support notifications 😔'); return; }
+    if (Notification.permission === 'granted' && localStorage.getItem('notifEnabled')) {
+      localStorage.removeItem('notifEnabled');
+      updateNotifyBtn();
+      showToast('notifications off.');
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      localSt      day: 'numeric', month: 'long', year: 'numeric'
     });
 
     card.innerHTML = `
