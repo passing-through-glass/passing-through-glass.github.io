@@ -1,40 +1,84 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>shīru's corner</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,600&family=Courier+Prime:ital,wght@0,400;1,400&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    :root {
-      --bg: #0d0b0f;
-      --surface: #14111a;
-      --surface2: #1d1826;
-      --border: #2e2840;
-      --text: #e8e0f0;
-      --muted: #7a6e8a;
-      --accent: #c9a96e;
-      --accent2: #9b6fa8;
-      --accent3: #6faaa8;
-      --danger: #a85050;
+<!-- ONLY showing changed JS parts to keep this usable on phone -->
+
+<script>
+  // ── INIT ─────────────────────────────────────
+  async function init() {
+    const { data: { session } } = await db.auth.getSession();
+    currentUser = session?.user ?? null;
+    updateFab();
+    await loadPosts();
+    updateNotifyBtn();
+
+    db.channel('posts-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, ({ new: post }) => {
+        document.getElementById('emptyState').style.display = 'none';
+        prependCard(post);
+
+        const type = post.post_type || post.type;
+        sendLocalNotification(post.title || ('new ' + type), post.content);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, ({ old: post }) => {
+        document.getElementById('post-' + post.id)?.remove();
+        checkEmpty();
+      })
+      .subscribe();
+  }
+
+  // ── BUILD CARD ────────────────────────────────
+  function makeCard(post, delay = 0) {
+    const type = post.post_type || post.type;
+
+    const card = document.createElement('div');
+    card.className = 'post-card';
+    card.id = 'post-' + post.id;
+    card.style.animationDelay = (delay * 0.08) + 's';
+
+    const date = new Date(post.created_at).toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    });
+
+    card.innerHTML = `
+      <div class="post-date">${date}</div>
+      ${post.title ? `<div class="post-title">${esc(post.title)}</div>` : ''}
+      <div class="post-body">${esc(post.content)}</div>
+      <span class="post-tag ${type}">${type}</span>
+      ${currentUser ? `<button class="delete-btn" onclick="deletePost('${post.id}')">× delete</button>` : ''}
+    `;
+    return card;
+  }
+
+  // ── PUBLISH ───────────────────────────────────
+  async function publishPost() {
+    const title   = document.getElementById('postTitle').value.trim();
+    const content = document.getElementById('postContent').value.trim();
+    const type    = document.getElementById('postType').value;
+    const btn     = document.getElementById('publishBtn');
+    document.getElementById('postError').textContent = '';
+
+    if (!content) {
+      document.getElementById('postError').textContent = 'write something first...';
+      return;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Courier Prime', monospace;
-      min-height: 100vh;
-      overflow-x: hidden;
+
+    btn.disabled = true; btn.textContent = 'publishing...';
+
+    const { error } = await db.from('posts').insert([
+      { title, content, post_type: type }
+    ]);
+
+    btn.disabled = false; btn.textContent = 'publish ✦';
+
+    if (error) {
+      document.getElementById('postError').textContent = 'error: ' + error.message;
+      return;
     }
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 1000;
+
+    document.getElementById('postTitle').value = '';
+    document.getElementById('postContent').value = '';
+    closeOverlay('adminOverlay');
+    showToast('posted ✦');
+  }
+</script>      z-index: 1000;
       opacity: 0.4;
     }
     header {
