@@ -6,7 +6,9 @@
   <title>shīru's corner</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,600&family=Courier+Prime:ital,wght@0,400;1,400&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4"></script>{
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4"></script>
+  <style>
+    :root {
       --bg: #0d0b0f;
       --surface: #14111a;
       --surface2: #1d1826;
@@ -391,7 +393,7 @@
   //  🔧 PASTE YOUR SUPABASE DETAILS HERE
   // ══════════════════════════════════════════════
   const SUPABASE_URL      = 'https://ltgwxymznsnwnahgqdgm.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_JZgKcAOepEH054OcQCYq_Q_QlFNY7JX.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0Z3d4eW16bnNud25haGdxZGdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0MDkxNTAsImV4cCI6MjA5Mjk4NTE1MH0.1M_l6UUQt0eFcl7XI_mLoBwlCn5m1KXdvghVMaf9m_0';
+  const SUPABASE_ANON_KEY = 'sb_publishable_JZgKcAOepEH054OcQCYq_Q_QlFNY7JX';
   // ══════════════════════════════════════════════
 
   const { createClient } = supabase;
@@ -600,6 +602,4 @@
       showToast('notifications off.');
       return;
     }
-    const perm = await Notification.requestPermission();
-    if (perm === 'granted') {
-      localSt
+    const perm = await Notification.requestPermi
