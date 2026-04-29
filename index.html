@@ -602,4 +602,45 @@
       showToast('notifications off.');
       return;
     }
-    const perm = await Notification.requestPermi
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      localStorage.setItem('notifEnabled', '1');
+      updateNotifyBtn();
+      showToast('you\'ll know when something new appears ✦');
+    } else {
+      showToast('notifications blocked. that\'s okay.');
+    }
+  }
+
+  function sendLocalNotification(title, body) {
+    if (Notification.permission === 'granted' && localStorage.getItem('notifEnabled')) {
+      new Notification('shīru\'s corner — ' + title, {
+        body: (body || '').substring(0, 80) + ((body || '').length > 80 ? '…' : ''),
+      });
+    }
+  }
+
+  function updateNotifyBtn() {
+    const btn = document.getElementById('notifyBtn');
+    const on  = Notification.permission === 'granted' && localStorage.getItem('notifEnabled');
+    btn.textContent = on ? '✦ notifications on — click to disable' : '✦ notify me when something new appears';
+    btn.classList.toggle('subscribed', !!on);
+  }
+
+  // ── UTILS ─────────────────────────────────────
+  function esc(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  init();
+</script>
+</body>
+</html>
