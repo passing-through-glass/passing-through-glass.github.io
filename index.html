@@ -191,6 +191,11 @@
   .ctrl-btn.del { border-color: transparent; background: none; color: var(--text-dim); width: 28px; height: 28px; }
 
   .vol-wrap { flex: 1; display: flex; align-items: center; }
+  .vol-row {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+  }
   input[type=range] {
     -webkit-appearance: none;
     appearance: none;
@@ -218,9 +223,14 @@
     border: none;
   }
 
-  .add-track {
-    width: 100%;
+  .track-actions {
+    display: flex;
+    gap: 8px;
     margin-top: 14px;
+  }
+
+  .add-track {
+    flex: 1;
     padding: 13px;
     border-radius: var(--radius);
     border: 1px dashed var(--line);
@@ -237,6 +247,20 @@
     color: var(--rec);
     border-style: solid;
   }
+
+  .upload-track {
+    flex: 1;
+    padding: 13px;
+    border-radius: var(--radius);
+    border: 1px dashed var(--line);
+    background: none;
+    color: var(--text-dim);
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+  }
+  .upload-track:active { border-color: var(--accent); color: var(--accent); }
 
   .hint {
     text-align: center;
@@ -371,6 +395,44 @@
     text-align: center;
   }
   .status-msg.show { opacity: 1; }
+
+  .wave-canvas {
+    width: 100%;
+    height: 90px;
+    display: block;
+    background: var(--panel-raised);
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    touch-action: none;
+  }
+  .trim-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin: 8px 2px 12px;
+  }
+  .trim-labels #selDurLabel { color: var(--accent); }
+  .trim-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .trim-tag {
+    font-family: 'Oswald', sans-serif;
+    font-size: 12px;
+    color: var(--text-dim);
+    width: 40px;
+    flex-shrink: 0;
+  }
+  .edit-btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .edit-btn-row .t-btn { flex: 1; justify-content: center; }
 </style>
 </head>
 <body>
@@ -387,6 +449,7 @@
   </div>
 
   <main id="trackList"></main>
+  <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
 
   <div class="transport">
     <div class="time-readout" id="timeReadout">0:00</div>
@@ -403,6 +466,32 @@
     <div id="projList"></div>
     <button class="new-proj-btn" id="newProjBtn">+ New session</button>
     <button class="close-sheet" id="closeSheet">Close</button>
+  </div>
+</div>
+
+<div class="overlay" id="editOverlay">
+  <div class="sheet">
+    <h2 id="editTitle">Edit track</h2>
+    <canvas id="waveCanvas" class="wave-canvas" height="90"></canvas>
+    <div class="trim-labels">
+      <span id="startLabel">0:00</span>
+      <span id="selDurLabel">0:00 selected</span>
+      <span id="endLabel">0:00</span>
+    </div>
+    <div class="trim-slider-row">
+      <span class="trim-tag">Start</span>
+      <input type="range" id="startRange" min="0" max="1" step="0.01" value="0">
+    </div>
+    <div class="trim-slider-row">
+      <span class="trim-tag">End</span>
+      <input type="range" id="endRange" min="0" max="1" step="0.01" value="1">
+    </div>
+    <div class="edit-btn-row">
+      <button class="t-btn" id="previewCropBtn">▶ Preview</button>
+      <button class="t-btn" id="resetCropBtn">Reset</button>
+    </div>
+    <button class="new-proj-btn" id="applyCropBtn">Apply crop</button>
+    <button class="close-sheet" id="closeEditSheet">Cancel</button>
   </div>
 </div>
 
@@ -470,6 +559,13 @@
   let activeSources = [];       // currently playing AudioBufferSourceNodes
   let playAllTimer = null;
   let soloSingleTrackId = null; // when playing a single track via its own play button
+  let editingTrack = null;
+  let editingBuffer = null;
+  let editingPeaks = null;
+  let editStart = 0;
+  let editEnd = 0;
+  let editPreviewSource = null;
+  let editPreviewTimer = null;
 
   const trackListEl = document.getElementById("trackList");
   const projNameEl = document.getElementById("projName");
@@ -478,6 +574,7 @@
   const stopBtn = document.getElementById("stopBtn");
   const timeReadout = document.getElementById("timeReadout");
   const statusMsg = document.getElementById("statusMsg");
+  const fileInputEl = document.getElementById("fileInput");
 
   function showStatus(text, ms){
     statusMsg.textContent = text;
@@ -566,19 +663,31 @@
       currentProject.tracks.forEach(t => trackListEl.appendChild(buildTrackRow(t)));
     }
 
+    const actions = document.createElement("div");
+    actions.className = "track-actions";
+
     const addBtn = document.createElement("button");
     addBtn.className = "add-track";
     addBtn.id = "addTrackBtn";
     addBtn.textContent = recordingTrackId ? "● Recording — tap to stop" : "● Record new track";
     if (recordingTrackId) addBtn.classList.add("recording");
     addBtn.addEventListener("click", onAddTrackTap);
-    trackListEl.appendChild(addBtn);
+    actions.appendChild(addBtn);
+
+    const uploadBtn = document.createElement("button");
+    uploadBtn.className = "upload-track";
+    uploadBtn.textContent = "⇪ Upload file";
+    uploadBtn.disabled = !!recordingTrackId;
+    uploadBtn.addEventListener("click", () => fileInputEl.click());
+    actions.appendChild(uploadBtn);
+
+    trackListEl.appendChild(actions);
 
     const hint = document.createElement("div");
     hint.className = "hint";
     hint.textContent = currentProject.tracks.length
       ? "Recording a new track plays back your existing tracks so you can play along."
-      : "Your first take sets the length — everything after layers on top of it.";
+      : "Your first take sets the length — everything after layers on top of it. You can also upload an existing audio file instead of recording.";
     trackListEl.appendChild(hint);
   }
 
@@ -625,6 +734,24 @@
       saveCurrentProject();
     });
 
+    const editBtn = document.createElement("button");
+    editBtn.className = "ctrl-btn edit";
+    editBtn.innerHTML = svgEdit();
+    editBtn.title = "Crop / edit";
+    editBtn.addEventListener("click", () => openEditSheet(t.id));
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "ctrl-btn del";
+    delBtn.innerHTML = svgTrash();
+    delBtn.addEventListener("click", () => deleteTrack(t.id));
+
+    controls.appendChild(playBtn);
+    controls.appendChild(muteBtn);
+    controls.appendChild(editBtn);
+    controls.appendChild(delBtn);
+
+    const volRow = document.createElement("div");
+    volRow.className = "vol-row";
     const volWrap = document.createElement("div");
     volWrap.className = "vol-wrap";
     const vol = document.createElement("input");
@@ -638,19 +765,11 @@
     });
     vol.addEventListener("change", () => saveCurrentProject());
     volWrap.appendChild(vol);
-
-    const delBtn = document.createElement("button");
-    delBtn.className = "ctrl-btn del";
-    delBtn.innerHTML = svgTrash();
-    delBtn.addEventListener("click", () => deleteTrack(t.id));
-
-    controls.appendChild(playBtn);
-    controls.appendChild(muteBtn);
-    controls.appendChild(volWrap);
-    controls.appendChild(delBtn);
+    volRow.appendChild(volWrap);
 
     row.appendChild(top);
     row.appendChild(controls);
+    row.appendChild(volRow);
     return row;
   }
 
@@ -660,6 +779,7 @@
   function svgVol(){ return '<svg width="15" height="15" viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/></svg>'; }
   function svgMuted(){ return '<svg width="15" height="15" viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/><line x1="16" y1="9" x2="22" y2="15" stroke="currentColor" stroke-width="2"/><line x1="22" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="2"/></svg>'; }
   function svgTrash(){ return '<svg width="14" height="14" viewBox="0 0 24 24"><path d="M6 7h12M9 7V4h6v3M7 7l1 13h8l1-13" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
+  function svgEdit(){ return '<svg width="14" height="14" viewBox="0 0 24 24"><path d="M4 20l4.3-.9L19.1 8.3a1.5 1.5 0 000-2.1l-1.3-1.3a1.5 1.5 0 00-2.1 0L4.9 15.7 4 20z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/></svg>'; }
   function svgDot(){ return '<svg class="dotsvg" width="12" height="12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>'; }
 
   // ---------- recording ----------
@@ -752,6 +872,38 @@
       renderTracks();
     }
   }
+
+  async function handleFileUpload(fileList){
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    for (const file of files) {
+      try {
+        const buf = await file.arrayBuffer();
+        const audioBuffer = await getAudioCtx().decodeAudioData(buf.slice(0));
+        const cleanName = file.name.replace(/\.[^/.]+$/, "");
+        const track = {
+          id: uid(),
+          name: cleanName || "Uploaded track",
+          blob: file,
+          duration: audioBuffer.duration,
+          volume: 1,
+          muted: false
+        };
+        decodedCache.set(track.id, audioBuffer);
+        currentProject.tracks.push(track);
+      } catch (err) {
+        showStatus('Couldn\'t read "' + file.name + '" as audio — skipped.', 2800);
+      }
+    }
+    await saveCurrentProject();
+    renderProject();
+  }
+
+  fileInputEl.addEventListener("change", (e) => {
+    handleFileUpload(e.target.files);
+    e.target.value = "";
+  });
 
   async function deleteTrack(id){
     currentProject.tracks = currentProject.tracks.filter(t => t.id !== id);
@@ -847,6 +999,235 @@
 
   function updateTransportState(){
     playAllBtn.disabled = currentProject.tracks.length === 0;
+  }
+
+  // ---------- track editing (crop) ----------
+  const editOverlay = document.getElementById("editOverlay");
+  const waveCanvas = document.getElementById("waveCanvas");
+  const startRangeEl = document.getElementById("startRange");
+  const endRangeEl = document.getElementById("endRange");
+  const previewCropBtn = document.getElementById("previewCropBtn");
+
+  function fmtTimeMs(sec){
+    sec = Math.max(0, sec || 0);
+    const m = Math.floor(sec / 60);
+    const s = sec - m * 60;
+    return m + ":" + s.toFixed(1).padStart(4, "0");
+  }
+
+  function computePeaks(buffer, bins){
+    const data = buffer.getChannelData(0);
+    const samples = data.length;
+    const step = Math.max(1, Math.floor(samples / bins));
+    const peaks = [];
+    for (let i = 0; i < bins; i++) {
+      const start = i * step;
+      const end = Math.min(samples, start + step);
+      let min = 0, max = 0;
+      for (let j = start; j < end; j++) {
+        const v = data[j];
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      peaks.push([min, max]);
+    }
+    return peaks;
+  }
+
+  async function openEditSheet(trackId){
+    const t = currentProject.tracks.find(x => x.id === trackId);
+    if (!t) return;
+    stopAllPlayback();
+    let buffer;
+    try { buffer = await ensureDecoded(t); }
+    catch (e) { showStatus("Couldn't load that track for editing.", 2600); return; }
+
+    editingTrack = t;
+    editingBuffer = buffer;
+    editingPeaks = computePeaks(buffer, 300);
+    editStart = 0;
+    editEnd = buffer.duration;
+
+    document.getElementById("editTitle").textContent = "Edit: " + t.name;
+    startRangeEl.min = 0; startRangeEl.max = buffer.duration; startRangeEl.step = 0.01; startRangeEl.value = 0;
+    endRangeEl.min = 0; endRangeEl.max = buffer.duration; endRangeEl.step = 0.01; endRangeEl.value = buffer.duration;
+    updateTrimLabels();
+    drawWaveform();
+    editOverlay.classList.add("show");
+  }
+
+  function closeEditSheetFn(){
+    stopEditPreview();
+    editOverlay.classList.remove("show");
+    editingTrack = null;
+    editingBuffer = null;
+    editingPeaks = null;
+  }
+
+  function updateTrimLabels(){
+    document.getElementById("startLabel").textContent = fmtTimeMs(editStart);
+    document.getElementById("endLabel").textContent = fmtTimeMs(editEnd);
+    document.getElementById("selDurLabel").textContent = fmtTimeMs(Math.max(0, editEnd - editStart)) + " selected";
+  }
+
+  function drawWaveform(){
+    if (!editingPeaks) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = waveCanvas.getBoundingClientRect();
+    const w = rect.width || 300;
+    const h = 90;
+    waveCanvas.width = w * dpr;
+    waveCanvas.height = h * dpr;
+    const ctx = waveCanvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const styles = getComputedStyle(document.documentElement);
+    const accent = styles.getPropertyValue("--accent").trim();
+    const dim = styles.getPropertyValue("--text-dim").trim();
+    const mid = h / 2;
+    const bins = editingPeaks.length;
+    const binW = w / bins;
+
+    for (let i = 0; i < bins; i++) {
+      const x = i * binW;
+      const t0 = (i / bins) * editingBuffer.duration;
+      const inSel = t0 >= editStart && t0 <= editEnd;
+      const [min, max] = editingPeaks[i];
+      ctx.strokeStyle = inSel ? accent : dim;
+      ctx.globalAlpha = inSel ? 1 : 0.35;
+      ctx.lineWidth = Math.max(1, binW * 0.8);
+      ctx.beginPath();
+      ctx.moveTo(x + binW / 2, mid + min * mid * 0.9);
+      ctx.lineTo(x + binW / 2, mid + max * mid * 0.9);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  startRangeEl.addEventListener("input", () => {
+    let v = parseFloat(startRangeEl.value);
+    const endV = parseFloat(endRangeEl.value);
+    if (v > endV - 0.05) v = Math.max(0, endV - 0.05);
+    startRangeEl.value = v;
+    editStart = v;
+    stopEditPreview();
+    updateTrimLabels();
+    drawWaveform();
+  });
+
+  endRangeEl.addEventListener("input", () => {
+    let v = parseFloat(endRangeEl.value);
+    const startV = parseFloat(startRangeEl.value);
+    if (v < startV + 0.05) v = Math.min(editingBuffer.duration, startV + 0.05);
+    endRangeEl.value = v;
+    editEnd = v;
+    stopEditPreview();
+    updateTrimLabels();
+    drawWaveform();
+  });
+
+  function stopEditPreview(){
+    if (editPreviewSource) { try { editPreviewSource.stop(); } catch(e){} editPreviewSource = null; }
+    clearTimeout(editPreviewTimer);
+    previewCropBtn.textContent = "▶ Preview";
+  }
+
+  previewCropBtn.addEventListener("click", () => {
+    if (editPreviewSource) { stopEditPreview(); return; }
+    const ctx = getAudioCtx();
+    const src = ctx.createBufferSource();
+    src.buffer = editingBuffer;
+    src.connect(ctx.destination);
+    const dur = Math.max(0, editEnd - editStart);
+    src.start(ctx.currentTime, editStart, dur);
+    editPreviewSource = src;
+    previewCropBtn.textContent = "■ Stop";
+    src.onended = () => { editPreviewSource = null; previewCropBtn.textContent = "▶ Preview"; };
+    editPreviewTimer = setTimeout(stopEditPreview, dur * 1000 + 100);
+  });
+
+  document.getElementById("resetCropBtn").addEventListener("click", () => {
+    stopEditPreview();
+    editStart = 0;
+    editEnd = editingBuffer.duration;
+    startRangeEl.value = 0;
+    endRangeEl.value = editEnd;
+    updateTrimLabels();
+    drawWaveform();
+  });
+
+  document.getElementById("applyCropBtn").addEventListener("click", applyCrop);
+  document.getElementById("closeEditSheet").addEventListener("click", closeEditSheetFn);
+
+  async function applyCrop(){
+    if (!editingTrack || !editingBuffer) return;
+    const sr = editingBuffer.sampleRate;
+    const chCount = editingBuffer.numberOfChannels;
+    const startSample = Math.floor(editStart * sr);
+    const endSample = Math.min(editingBuffer.length, Math.floor(editEnd * sr));
+    const frameCount = Math.max(1, endSample - startSample);
+
+    if (frameCount < sr * 0.05) { showStatus("Selection is too short.", 2200); return; }
+
+    const newBuffer = getAudioCtx().createBuffer(chCount, frameCount, sr);
+    for (let c = 0; c < chCount; c++) {
+      const oldData = editingBuffer.getChannelData(c);
+      const newData = newBuffer.getChannelData(c);
+      newData.set(oldData.subarray(startSample, startSample + frameCount));
+    }
+
+    const wavBlob = encodeWav(newBuffer);
+    const track = editingTrack;
+    track.blob = wavBlob;
+    track.duration = newBuffer.duration;
+    decodedCache.set(track.id, newBuffer);
+
+    await saveCurrentProject();
+    closeEditSheetFn();
+    renderProject();
+    showStatus("Track cropped.", 1800);
+  }
+
+  function encodeWav(buffer){
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const numFrames = buffer.length;
+    const blockAlign = numChannels * 2;
+    const dataSize = numFrames * blockAlign;
+    const arr = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(arr);
+
+    writeStr(view, 0, "RIFF");
+    view.setUint32(4, 36 + dataSize, true);
+    writeStr(view, 8, "WAVE");
+    writeStr(view, 12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true);
+    writeStr(view, 36, "data");
+    view.setUint32(40, dataSize, true);
+
+    const channels = [];
+    for (let c = 0; c < numChannels; c++) channels.push(buffer.getChannelData(c));
+    let offset = 44;
+    for (let i = 0; i < numFrames; i++) {
+      for (let c = 0; c < numChannels; c++) {
+        let sample = Math.max(-1, Math.min(1, channels[c][i]));
+        sample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+        view.setInt16(offset, sample, true);
+        offset += 2;
+      }
+    }
+    return new Blob([arr], { type: "audio/wav" });
+  }
+
+  function writeStr(view, offset, str){
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
   }
 
   // ---------- projects sheet ----------
