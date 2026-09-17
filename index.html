@@ -1,646 +1,930 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>shīru's corner</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,600&family=Courier+Prime:ital,wght@0,400;1,400&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4"></script>
-  <style>
-    :root {
-      --bg: #0d0b0f;
-      --surface: #14111a;
-      --surface2: #1d1826;
-      --border: #2e2840;
-      --text: #e8e0f0;
-      --muted: #7a6e8a;
-      --accent: #c9a96e;
-      --accent2: #9b6fa8;
-      --accent3: #6faaa8;
-      --danger: #a85050;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Courier Prime', monospace;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 1000;
-      opacity: 0.4;
-    }
-    header {
-      text-align: center;
-      padding: 4rem 2rem 2rem;
-    }
-    .site-title {
-      font-family: 'IM Fell English', serif;
-      font-size: clamp(2.4rem, 7vw, 5rem);
-      color: var(--text);
-      letter-spacing: 0.04em;
-      font-style: italic;
-      line-height: 1;
-    }
-    .site-title span { color: var(--accent); }
-    .site-subtitle {
-      font-size: 0.75rem;
-      color: var(--muted);
-      letter-spacing: 0.25em;
-      text-transform: uppercase;
-      margin-top: 0.7rem;
-    }
-    .divider {
-      width: 120px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      margin: 1.5rem auto;
-    }
-    .notify-bar { text-align: center; margin-bottom: 1rem; }
-    .notify-btn {
-      background: transparent;
-      border: 1px solid var(--accent2);
-      color: var(--accent2);
-      font-family: 'Courier Prime', monospace;
-      font-size: 0.78rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      padding: 0.5rem 1.4rem;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      border-radius: 2px;
-    }
-    .notify-btn:hover { background: var(--accent2); color: var(--bg); }
-    .notify-btn.subscribed { border-color: var(--accent3); color: var(--accent3); }
-    .notify-btn.subscribed:hover { background: var(--accent3); color: var(--bg); }
-    main {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 1rem 2rem 6rem;
-    }
-    .loading-state {
-      text-align: center;
-      color: var(--muted);
-      padding: 4rem 0;
-      font-style: italic;
-      font-family: 'IM Fell English', serif;
-      font-size: 1rem;
-    }
-    .dot { display: inline-block; animation: blink 1.4s infinite; }
-    .dot:nth-child(2) { animation-delay: 0.2s; }
-    .dot:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes blink {
-      0%, 80%, 100% { opacity: 0; }
-      40% { opacity: 1; }
-    }
-    .empty-state {
-      text-align: center;
-      color: var(--muted);
-      font-style: italic;
-      padding: 4rem 0;
-      font-family: 'IM Fell English', serif;
-      font-size: 1.1rem;
-      display: none;
-    }
-    .post-card {
-      border-left: 2px solid var(--border);
-      padding: 2rem 0 2rem 1.8rem;
-      margin-bottom: 0.5rem;
-      position: relative;
-      transition: border-color 0.3s;
-      animation: fadeIn 0.6s ease both;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(12px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .post-card:hover { border-color: var(--accent); }
-    .post-card::before {
-      content: '✦';
-      position: absolute;
-      left: -0.62rem;
-      top: 2rem;
-      color: var(--accent);
-      font-size: 0.7rem;
-      background: var(--bg);
-      padding: 2px 0;
-    }
-    .post-date {
-      font-size: 0.68rem;
-      color: var(--muted);
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      margin-bottom: 0.8rem;
-    }
-    .post-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 1.35rem;
-      font-weight: 400;
-      color: var(--text);
-      margin-bottom: 1rem;
-      font-style: italic;
-    }
-    .post-body {
-      font-size: 0.92rem;
-      line-height: 1.9;
-      color: #c4bcd4;
-      white-space: pre-wrap;
-    }
-    .post-tag {
-      display: inline-block;
-      font-size: 0.65rem;
-      letter-spacing: 0.15em;
-      color: var(--accent2);
-      border: 1px solid var(--accent2);
-      padding: 0.15rem 0.5rem;
-      margin-top: 1rem;
-      text-transform: uppercase;
-      opacity: 0.7;
-    }
-    .post-tag.update { color: var(--accent3); border-color: var(--accent3); }
-    .post-tag.fragment { color: var(--accent); border-color: var(--accent); }
-    .post-separator {
-      height: 1px;
-      background: linear-gradient(90deg, var(--border), transparent);
-      margin: 0 0 0 1.8rem;
-    }
-    .delete-btn {
-      font-size: 0.65rem;
-      color: var(--muted);
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-family: 'Courier Prime', monospace;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      padding: 0;
-      margin-top: 0.8rem;
-      display: block;
-      transition: color 0.2s;
-    }
-    .delete-btn:hover { color: var(--danger); }
-    .admin-toggle {
-      position: fixed;
-      bottom: 2rem;
-      right: 2rem;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      cursor: pointer;
-      font-size: 1rem;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.3s;
-      z-index: 100;
-    }
-    .admin-toggle:hover { border-color: var(--accent); color: var(--accent); }
-    .admin-toggle.logged-in { border-color: var(--accent); color: var(--accent); }
-    .overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.75);
-      z-index: 200;
-      backdrop-filter: blur(5px);
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-    }
-    .overlay.active { display: flex; }
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 2rem;
-      width: 100%;
-      max-width: 520px;
-      max-height: 90vh;
-      overflow-y: auto;
-      animation: modalIn 0.3s ease;
-    }
-    @keyframes modalIn {
-      from { opacity: 0; transform: scale(0.96) translateY(10px); }
-      to   { opacity: 1; transform: scale(1) translateY(0); }
-    }
-    .modal-title {
-      font-family: 'IM Fell English', serif;
-      font-size: 1.4rem;
-      font-style: italic;
-      color: var(--accent);
-      margin-bottom: 1.5rem;
-    }
-    label {
-      display: block;
-      font-size: 0.7rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 0.4rem;
-      margin-top: 1.2rem;
-    }
-    input[type="text"],
-    input[type="password"],
-    input[type="email"],
-    textarea,
-    select {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: 'Courier Prime', monospace;
-      font-size: 0.9rem;
-      padding: 0.6rem 0.8rem;
-      outline: none;
-      transition: border-color 0.2s;
-      border-radius: 2px;
-    }
-    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
-    textarea { resize: vertical; min-height: 200px; }
-    select option { background: var(--surface2); }
-    .btn-row {
-      display: flex;
-      gap: 0.8rem;
-      margin-top: 1.5rem;
-      flex-wrap: wrap;
-    }
-    .btn {
-      font-family: 'Courier Prime', monospace;
-      font-size: 0.78rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      padding: 0.55rem 1.2rem;
-      border: 1px solid;
-      cursor: pointer;
-      transition: all 0.2s;
-      border-radius: 2px;
-    }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
-    .btn-primary:hover:not(:disabled) { opacity: 0.85; }
-    .btn-ghost { background: transparent; border-color: var(--border); color: var(--muted); }
-    .btn-ghost:hover { border-color: var(--muted); color: var(--text); }
-    .btn-danger { background: transparent; border-color: var(--danger); color: var(--danger); }
-    .btn-danger:hover { background: var(--danger); color: var(--text); }
-    .error-msg {
-      font-size: 0.78rem;
-      color: var(--danger);
-      margin-top: 0.6rem;
-      min-height: 1rem;
-    }
-    .toast {
-      position: fixed;
-      bottom: 2rem;
-      left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: var(--surface2);
-      border: 1px solid var(--accent);
-      color: var(--text);
-      font-family: 'Courier Prime', monospace;
-      font-size: 0.8rem;
-      padding: 0.6rem 1.2rem;
-      border-radius: 2px;
-      z-index: 500;
-      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-      pointer-events: none;
-      white-space: nowrap;
-    }
-    .toast.show { transform: translateX(-50%) translateY(0); }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #15181b;
+    --panel: #1e2226;
+    --panel-raised: #24282c;
+    --line: #32373b;
+    --text: #ece7dd;
+    --text-dim: #8b9094;
+    --accent: #c9a227;
+    --accent-dim: #8a721f;
+    --rec: #c1443c;
+    --rec-dim: #7a2b26;
+    --radius: 3px;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 520px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    position: relative;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    padding: 18px 18px 14px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .wordmark {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: 0.03em;
+    color: var(--text);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .wordmark .dot { color: var(--accent); font-size: 22px; line-height: 0; }
+
+  .proj-btn {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    padding: 7px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+  .proj-btn:active { background: var(--panel-raised); }
+
+  .proj-title {
+    padding: 10px 18px 16px;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 500;
+    font-size: 17px;
+    color: var(--text);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .proj-title input {
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: 'Oswald', sans-serif;
+    font-weight: 500;
+    font-size: 17px;
+    width: 100%;
+    outline: none;
+  }
+  .proj-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  /* ---------- track list ---------- */
+  main {
+    flex: 1;
+    padding: 10px 14px 130px;
+  }
+
+  .empty {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .empty strong { color: var(--text); display: block; font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 500; margin-bottom: 8px; }
+
+  .track {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin: 8px 0;
+  }
+  .track.recording { border-color: var(--rec); }
+
+  .track-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .track-name {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 500;
+    font-size: 15px;
+    background: none;
+    border: none;
+    color: var(--text);
+    outline: none;
+    width: 60%;
+    padding: 0;
+  }
+  .track-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .track-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ctrl-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--panel-raised);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+  }
+  .ctrl-btn:active { background: var(--line); }
+  .ctrl-btn.play.playing { border-color: var(--accent); color: var(--accent); }
+  .ctrl-btn.mute.muted { border-color: var(--text-dim); background: var(--line); color: var(--text-dim); }
+  .ctrl-btn.rec-dot { border-color: var(--rec); }
+  .ctrl-btn.rec-dot .dotsvg { fill: var(--rec); }
+  .ctrl-btn.rec-dot.active { background: var(--rec); }
+  .ctrl-btn.rec-dot.active .dotsvg { fill: var(--bg); }
+  .ctrl-btn.del { border-color: transparent; background: none; color: var(--text-dim); width: 28px; height: 28px; }
+
+  .vol-wrap { flex: 1; display: flex; align-items: center; }
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--line);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+
+  .add-track {
+    width: 100%;
+    margin-top: 14px;
+    padding: 13px;
+    border-radius: var(--radius);
+    border: 1px dashed var(--line);
+    background: none;
+    color: var(--text-dim);
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+  }
+  .add-track:active { border-color: var(--accent); color: var(--accent); }
+  .add-track.recording {
+    border: 1px solid var(--rec);
+    color: var(--rec);
+    border-style: solid;
+  }
+
+  .hint {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-top: 10px;
+    line-height: 1.5;
+    padding: 0 10px;
+  }
+
+  /* ---------- transport ---------- */
+  .transport {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 0;
+    width: 100%;
+    max-width: 520px;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .time-readout {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--accent);
+    min-width: 46px;
+  }
+  .transport-btns { display: flex; gap: 10px; flex: 1; justify-content: flex-end; }
+  .t-btn {
+    border: 1px solid var(--line);
+    background: var(--panel-raised);
+    color: var(--text);
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .t-btn:active { background: var(--line); }
+  .t-btn.play { border-color: var(--accent); color: var(--accent); }
+  .t-btn.play.on { background: var(--accent); color: var(--bg); }
+  .t-btn:disabled { opacity: 0.35; }
+
+  /* ---------- modal ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,12,13,0.72);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 50;
+  }
+  .overlay.show { display: flex; }
+  .sheet {
+    width: 100%;
+    max-width: 520px;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    border-radius: 10px 10px 0 0;
+    padding: 18px 18px calc(20px + env(safe-area-inset-bottom));
+    max-height: 78vh;
+    overflow-y: auto;
+  }
+  .sheet h2 {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 500;
+    font-size: 17px;
+    margin: 0 0 14px;
+  }
+  .proj-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--line);
+    gap: 10px;
+  }
+  .proj-row:last-of-type { border-bottom: none; }
+  .proj-row .p-name { font-size: 14px; color: var(--text); flex: 1; }
+  .proj-row .p-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); }
+  .proj-row .p-del { color: var(--text-dim); background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; }
+  .new-proj-btn {
+    width: 100%;
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--accent);
+    background: none;
+    color: var(--accent);
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .close-sheet {
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin-top: 16px;
+    padding: 10px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .status-msg {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-size: 13px;
+    padding: 9px 16px;
+    border-radius: var(--radius);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    max-width: 90%;
+    text-align: center;
+  }
+  .status-msg.show { opacity: 1; }
+</style>
 </head>
 <body>
+<div class="app">
 
-<header>
-  <div class="site-title">shīru<span>'s</span> corner</div>
-  <div class="site-subtitle">poetry &amp; thoughts &amp; whatever else</div>
-  <div class="divider"></div>
-</header>
+  <header>
+    <div class="wordmark">SPOOL<span class="dot">·</span></div>
+    <button class="proj-btn" id="projectsBtn">Projects</button>
+  </header>
 
-<div class="notify-bar">
-  <button class="notify-btn" id="notifyBtn" onclick="toggleNotifications()">
-    ✦ notify me when something new appears
-  </button>
-</div>
-
-<main id="feed">
-  <div class="loading-state" id="loadingState">
-    loading<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+  <div class="proj-title">
+    <input id="projName" spellcheck="false" placeholder="Untitled session">
+    <span class="proj-meta" id="trackCount">0 tracks</span>
   </div>
-  <div class="empty-state" id="emptyState">
-    nothing here yet.<br>the silence is part of the poem.
-  </div>
-</main>
 
-<button class="admin-toggle" id="adminFab" title="admin" onclick="handleFabClick()">⌘</button>
+  <main id="trackList"></main>
 
-<!-- Login modal -->
-<div class="overlay" id="loginOverlay">
-  <div class="modal">
-    <div class="modal-title">who goes there?</div>
-    <label>email</label>
-    <input type="email" id="loginEmail" placeholder="your@email.com" />
-    <label>password</label>
-    <input type="password" id="loginPassword" placeholder="···"
-      onkeydown="if(event.key==='Enter') login()" />
-    <div class="error-msg" id="loginError"></div>
-    <div class="btn-row">
-      <button class="btn btn-primary" id="loginBtn" onclick="login()">enter →</button>
-      <button class="btn btn-ghost" onclick="closeOverlay('loginOverlay')">nevermind</button>
+  <div class="transport">
+    <div class="time-readout" id="timeReadout">0:00</div>
+    <div class="transport-btns">
+      <button class="t-btn" id="stopBtn" disabled>■ Stop</button>
+      <button class="t-btn play" id="playAllBtn" disabled>▶ Play all</button>
     </div>
   </div>
 </div>
 
-<!-- Write modal -->
-<div class="overlay" id="adminOverlay">
-  <div class="modal">
-    <div class="modal-title">write something.</div>
-    <label>type</label>
-    <select id="postType">
-      <option value="poem">poem</option>
-      <option value="update">update</option>
-      <option value="fragment">fragment</option>
-    </select>
-    <label>title <span style="color:var(--muted);font-size:0.65rem">(optional)</span></label>
-    <input type="text" id="postTitle" placeholder="untitled" />
-    <label>content</label>
-    <textarea id="postContent" placeholder="write here..."></textarea>
-    <div class="error-msg" id="postError"></div>
-    <div class="btn-row">
-      <button class="btn btn-primary" id="publishBtn" onclick="publishPost()">publish ✦</button>
-      <button class="btn btn-ghost" onclick="closeOverlay('adminOverlay')">close</button>
-      <button class="btn btn-danger" onclick="logout()">sign out</button>
-    </div>
+<div class="overlay" id="projOverlay">
+  <div class="sheet">
+    <h2>Your sessions</h2>
+    <div id="projList"></div>
+    <button class="new-proj-btn" id="newProjBtn">+ New session</button>
+    <button class="close-sheet" id="closeSheet">Close</button>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="status-msg" id="statusMsg"></div>
 
 <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
-  }
-</script>
+(function(){
+  "use strict";
 
-<script>
-  // ══════════════════════════════════════════════
-  //  🔧 PASTE YOUR SUPABASE DETAILS HERE
-  // ══════════════════════════════════════════════
-  const SUPABASE_URL      = 'https://ltgwxymznsnwnahgqdgm.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_JZgKcAOepEH054OcQCYq_Q_QlFNY7JX';
-  // ══════════════════════════════════════════════
+  // ---------- storage (IndexedDB) ----------
+  const DB_NAME = "spool-db";
+  const DB_VERSION = 1;
+  let db;
 
-  const { createClient } = supabase;
-  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  let currentUser = null;
-
-  // ── INIT ─────────────────────────────────────
-  async function init() {
-    const { data: { session } } = await db.auth.getSession();
-    currentUser = session?.user ?? null;
-    updateFab();
-    await loadPosts();
-    updateNotifyBtn();
-
-    // realtime: new post
-    db.channel('posts-channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, ({ new: post }) => {
-        document.getElementById('emptyState').style.display = 'none';
-        prependCard(post);
-        sendLocalNotification(post.title || ('new ' + post.post_type), post.content);
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, ({ old: post }) => {
-        document.getElementById('post-' + post.id)?.remove();
-        checkEmpty();
-      })
-      .subscribe();
-  }
-
-  // ── LOAD POSTS ────────────────────────────────
-  async function loadPosts() {
-    const { data, error } = await db
-      .from('posts')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    document.getElementById('loadingState').style.display = 'none';
-
-    if (error || !data || data.length === 0) {
-      document.getElementById('emptyState').style.display = 'block';
-      return;
-    }
-
-    data.forEach((post, i) => appendCard(post, i));
-  }
-
-  // ── BUILD CARD ────────────────────────────────
-  function makeCard(post, delay = 0) {
-    const card = document.createElement('div');
-    card.className = 'post-card';
-    card.id = 'post-' + post.id;
-    card.style.animationDelay = (delay * 0.08) + 's';
-    const date = new Date(post.created_at).toLocaleDateString('en-GB', {
-      day: 'numeric', month: 'long', year: 'numeric'
+  function openDB(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const _db = e.target.result;
+        if (!_db.objectStoreNames.contains("projects")) {
+          _db.createObjectStore("projects", { keyPath: "id" });
+        }
+      };
+      req.onsuccess = (e) => resolve(e.target.result);
+      req.onerror = (e) => reject(e.target.error);
     });
-    card.innerHTML = `
-      <div class="post-date">${date}</div>
-      ${post.title ? `<div class="post-title">${esc(post.title)}</div>` : ''}
-      <div class="post-body">${esc(post.content)}</div>
-      <span class="post-tag ${post.post_type}">${post.post_type}</span>
-      ${currentUser ? `<button class="delete-btn" onclick="deletePost('${post.id}')">× delete</button>` : ''}
-    `;
-    return card;
   }
 
-  function appendCard(post, i) {
-    const feed = document.getElementById('feed');
-    const existing = feed.querySelectorAll('.post-card');
-    if (existing.length > 0) {
-      const sep = document.createElement('div');
-      sep.className = 'post-separator';
-      feed.appendChild(sep);
+  function idbGetAll(){
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("projects", "readonly");
+      const store = tx.objectStore("projects");
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function idbPut(project){
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("projects", "readwrite");
+      tx.objectStore("projects").put(project);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  function idbDelete(id){
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("projects", "readwrite");
+      tx.objectStore("projects").delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // ---------- state ----------
+  let currentProject = null;   // { id, name, createdAt, tracks: [...] }
+  let audioCtx = null;
+  let mediaStream = null;
+  let mediaRecorder = null;
+  let recordChunks = [];
+  let recordingTrackId = null;
+  let decodedCache = new Map(); // trackId -> AudioBuffer
+  let activeSources = [];       // currently playing AudioBufferSourceNodes
+  let playAllTimer = null;
+  let soloSingleTrackId = null; // when playing a single track via its own play button
+
+  const trackListEl = document.getElementById("trackList");
+  const projNameEl = document.getElementById("projName");
+  const trackCountEl = document.getElementById("trackCount");
+  const playAllBtn = document.getElementById("playAllBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const timeReadout = document.getElementById("timeReadout");
+  const statusMsg = document.getElementById("statusMsg");
+
+  function showStatus(text, ms){
+    statusMsg.textContent = text;
+    statusMsg.classList.add("show");
+    clearTimeout(showStatus._t);
+    showStatus._t = setTimeout(() => statusMsg.classList.remove("show"), ms || 2200);
+  }
+
+  function fmtTime(sec){
+    sec = Math.max(0, Math.round(sec || 0));
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
+  function uid(){
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function getAudioCtx(){
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    feed.appendChild(makeCard(post, i));
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
   }
 
-  function prependCard(post) {
-    const feed = document.getElementById('feed');
-    const firstCard = feed.querySelector('.post-card');
-    const card = makeCard(post, 0);
-    if (firstCard) {
-      const sep = document.createElement('div');
-      sep.className = 'post-separator';
-      feed.insertBefore(sep, firstCard);
-      feed.insertBefore(card, sep);
+  // ---------- project lifecycle ----------
+  async function createProject(name){
+    const p = { id: uid(), name: name || "Untitled session", createdAt: Date.now(), tracks: [] };
+    await idbPut(p);
+    localStorage.setItem("spool-last-project", p.id);
+    currentProject = p;
+    decodedCache.clear();
+    renderProject();
+  }
+
+  async function loadProject(id){
+    const all = await idbGetAll();
+    const p = all.find(x => x.id === id);
+    if (p) {
+      currentProject = p;
+      localStorage.setItem("spool-last-project", p.id);
+      decodedCache.clear();
+      renderProject();
+    }
+  }
+
+  async function saveCurrentProject(){
+    if (!currentProject) return;
+    await idbPut(currentProject);
+  }
+
+  async function initApp(){
+    db = await openDB();
+    const all = await idbGetAll();
+    const lastId = localStorage.getItem("spool-last-project");
+    let toLoad = null;
+    if (lastId) toLoad = all.find(p => p.id === lastId);
+    if (!toLoad && all.length) toLoad = all.slice().sort((a,b) => b.createdAt - a.createdAt)[0];
+    if (toLoad) {
+      currentProject = toLoad;
+      renderProject();
     } else {
-      feed.appendChild(card);
+      await createProject("My first session");
     }
   }
 
-  function checkEmpty() {
-    const has = document.querySelector('.post-card');
-    document.getElementById('emptyState').style.display = has ? 'none' : 'block';
+  // ---------- rendering ----------
+  function renderProject(){
+    projNameEl.value = currentProject.name;
+    trackCountEl.textContent = currentProject.tracks.length + (currentProject.tracks.length === 1 ? " track" : " tracks");
+    renderTracks();
+    updateTransportState();
   }
 
-  // ── AUTH ──────────────────────────────────────
-  function handleFabClick() {
-    if (currentUser) {
-      document.getElementById('adminOverlay').classList.add('active');
+  function renderTracks(){
+    trackListEl.innerHTML = "";
+
+    if (currentProject.tracks.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.innerHTML = "<strong>No tracks yet</strong>Hit record below to lay down your first layer.<br>Headphones recommended once you start stacking takes.";
+      trackListEl.appendChild(empty);
     } else {
-      document.getElementById('loginEmail').value = '';
-      document.getElementById('loginPassword').value = '';
-      document.getElementById('loginError').textContent = '';
-      document.getElementById('loginOverlay').classList.add('active');
-      setTimeout(() => document.getElementById('loginEmail').focus(), 100);
+      currentProject.tracks.forEach(t => trackListEl.appendChild(buildTrackRow(t)));
     }
+
+    const addBtn = document.createElement("button");
+    addBtn.className = "add-track";
+    addBtn.id = "addTrackBtn";
+    addBtn.textContent = recordingTrackId ? "● Recording — tap to stop" : "● Record new track";
+    if (recordingTrackId) addBtn.classList.add("recording");
+    addBtn.addEventListener("click", onAddTrackTap);
+    trackListEl.appendChild(addBtn);
+
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = currentProject.tracks.length
+      ? "Recording a new track plays back your existing tracks so you can play along."
+      : "Your first take sets the length — everything after layers on top of it.";
+    trackListEl.appendChild(hint);
   }
 
-  async function login() {
-    const email = document.getElementById('loginEmail').value.trim();
-    const pass  = document.getElementById('loginPassword').value;
-    const btn   = document.getElementById('loginBtn');
-    document.getElementById('loginError').textContent = '';
-    btn.disabled = true; btn.textContent = 'entering...';
+  function buildTrackRow(t){
+    const row = document.createElement("div");
+    row.className = "track" + (t.id === recordingTrackId ? " recording" : "");
+    row.dataset.id = t.id;
 
-    const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
-    btn.disabled = false; btn.textContent = 'enter →';
+    const top = document.createElement("div");
+    top.className = "track-top";
 
-    if (error) {
-      document.getElementById('loginError').textContent = 'wrong credentials, try again.';
+    const nameInput = document.createElement("input");
+    nameInput.className = "track-name";
+    nameInput.value = t.name;
+    nameInput.spellcheck = false;
+    nameInput.addEventListener("change", () => {
+      t.name = nameInput.value || "Track";
+      saveCurrentProject();
+    });
+
+    const timeEl = document.createElement("span");
+    timeEl.className = "track-time";
+    timeEl.textContent = t.id === recordingTrackId ? "rec…" : fmtTime(t.duration);
+
+    top.appendChild(nameInput);
+    top.appendChild(timeEl);
+
+    const controls = document.createElement("div");
+    controls.className = "track-row";
+
+    const playBtn = document.createElement("button");
+    playBtn.className = "ctrl-btn play";
+    playBtn.innerHTML = svgPlay();
+    playBtn.title = "Preview this track alone";
+    playBtn.addEventListener("click", () => toggleSoloPlay(t.id, playBtn));
+
+    const muteBtn = document.createElement("button");
+    muteBtn.className = "ctrl-btn mute" + (t.muted ? " muted" : "");
+    muteBtn.innerHTML = t.muted ? svgMuted() : svgVol();
+    muteBtn.addEventListener("click", () => {
+      t.muted = !t.muted;
+      muteBtn.classList.toggle("muted", t.muted);
+      muteBtn.innerHTML = t.muted ? svgMuted() : svgVol();
+      saveCurrentProject();
+    });
+
+    const volWrap = document.createElement("div");
+    volWrap.className = "vol-wrap";
+    const vol = document.createElement("input");
+    vol.type = "range";
+    vol.min = "0";
+    vol.max = "1";
+    vol.step = "0.01";
+    vol.value = t.volume;
+    vol.addEventListener("input", () => {
+      t.volume = parseFloat(vol.value);
+    });
+    vol.addEventListener("change", () => saveCurrentProject());
+    volWrap.appendChild(vol);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "ctrl-btn del";
+    delBtn.innerHTML = svgTrash();
+    delBtn.addEventListener("click", () => deleteTrack(t.id));
+
+    controls.appendChild(playBtn);
+    controls.appendChild(muteBtn);
+    controls.appendChild(volWrap);
+    controls.appendChild(delBtn);
+
+    row.appendChild(top);
+    row.appendChild(controls);
+    return row;
+  }
+
+  // ---------- icons ----------
+  function svgPlay(){ return '<svg width="13" height="13" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8z" fill="currentColor"/></svg>'; }
+  function svgStop(){ return '<svg width="12" height="12" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" fill="currentColor"/></svg>'; }
+  function svgVol(){ return '<svg width="15" height="15" viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/></svg>'; }
+  function svgMuted(){ return '<svg width="15" height="15" viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/><line x1="16" y1="9" x2="22" y2="15" stroke="currentColor" stroke-width="2"/><line x1="22" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="2"/></svg>'; }
+  function svgTrash(){ return '<svg width="14" height="14" viewBox="0 0 24 24"><path d="M6 7h12M9 7V4h6v3M7 7l1 13h8l1-13" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
+  function svgDot(){ return '<svg class="dotsvg" width="12" height="12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>'; }
+
+  // ---------- recording ----------
+  async function onAddTrackTap(){
+    if (recordingTrackId) {
+      stopRecording();
       return;
     }
-    currentUser = data.user;
-    closeOverlay('loginOverlay');
-    updateFab();
-    refreshFeed();
-    document.getElementById('adminOverlay').classList.add('active');
-    showToast('welcome back ✦');
-  }
-
-  async function logout() {
-    await db.auth.signOut();
-    currentUser = null;
-    closeOverlay('adminOverlay');
-    updateFab();
-    refreshFeed();
-    showToast('signed out.');
-  }
-
-  function updateFab() {
-    document.getElementById('adminFab').classList.toggle('logged-in', !!currentUser);
-  }
-
-  function refreshFeed() {
-    document.querySelectorAll('.post-card, .post-separator').forEach(el => el.remove());
-    document.getElementById('emptyState').style.display = 'none';
-    document.getElementById('loadingState').style.display = 'block';
-    loadPosts();
-  }
-
-  // ── PUBLISH ───────────────────────────────────
-  async function publishPost() {
-    const title   = document.getElementById('postTitle').value.trim();
-    const content = document.getElementById('postContent').value.trim();
-    const type    = document.getElementById('postType').value;
-    const btn     = document.getElementById('publishBtn');
-    document.getElementById('postError').textContent = '';
-
-    if (!content) {
-      document.getElementById('postError').textContent = 'write something first...';
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      showStatus("Couldn't access the microphone — check permissions.", 3200);
       return;
     }
 
-    btn.disabled = true; btn.textContent = 'publishing...';
-    const { error } = await db.from('posts').insert([{ title, content, post_type: type }]);
-    btn.disabled = false; btn.textContent = 'publish ✦';
+    const mimeType = pickMimeType();
+    mediaRecorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
+    recordChunks = [];
+    recordingTrackId = "pending";
 
-    if (error) {
-      document.getElementById('postError').textContent = 'error: ' + error.message;
+    mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) recordChunks.push(e.data); };
+    mediaRecorder.onstop = onRecordingStopped;
+
+    // play existing tracks underneath so the user can layer in time
+    stopAllPlayback();
+    if (currentProject.tracks.length) {
+      playTracksInternal(currentProject.tracks, { forMonitoring: true });
+    }
+
+    mediaRecorder.start();
+    renderTracks();
+    showStatus("Recording…", 1400);
+  }
+
+  function pickMimeType(){
+    const candidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/ogg;codecs=opus"
+    ];
+    for (const c of candidates) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)) return c;
+    }
+    return "";
+  }
+
+  function stopRecording(){
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
+    stopAllPlayback();
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(tr => tr.stop());
+      mediaStream = null;
+    }
+  }
+
+  async function onRecordingStopped(){
+    const blob = new Blob(recordChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+    recordChunks = [];
+    recordingTrackId = null;
+
+    if (blob.size < 300) {
+      showStatus("That take was too short — nothing saved.", 2600);
+      renderTracks();
       return;
     }
 
-    document.getElementById('postTitle').value = '';
-    document.getElementById('postContent').value = '';
-    closeOverlay('adminOverlay');
-    showToast('posted ✦');
-  }
-
-  // ── DELETE ────────────────────────────────────
-  async function deletePost(id) {
-    if (!confirm('delete this post?')) return;
-    const { error } = await db.from('posts').delete().eq('id', id);
-    if (error) { showToast('couldn\'t delete 😔'); return; }
-    document.getElementById('post-' + id)?.remove();
-    checkEmpty();
-    showToast('deleted.');
-  }
-
-  // ── OVERLAY HELPERS ───────────────────────────
-  function closeOverlay(id) {
-    document.getElementById(id).classList.remove('active');
-  }
-  document.querySelectorAll('.overlay').forEach(o => {
-    o.addEventListener('click', e => { if (e.target === o) o.classList.remove('active'); });
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape')
-      document.querySelectorAll('.overlay.active').forEach(o => o.classList.remove('active'));
-  });
-
-  // ── NOTIFICATIONS ─────────────────────────────
-  async function toggleNotifications() {
-    if (!('Notification' in window)) { showToast('browser doesn\'t support notifications 😔'); return; }
-    if (Notification.permission === 'granted' && localStorage.getItem('notifEnabled')) {
-      localStorage.removeItem('notifEnabled');
-      updateNotifyBtn();
-      showToast('notifications off.');
-      return;
-    }
-    const perm = await Notification.requestPermission();
-    if (perm === 'granted') {
-      localStorage.setItem('notifEnabled', '1');
-      updateNotifyBtn();
-      showToast('you\'ll know when something new appears ✦');
-    } else {
-      showToast('notifications blocked. that\'s okay.');
+    let duration = 0;
+    try {
+      const buf = await blob.arrayBuffer();
+      const audioBuffer = await getAudioCtx().decodeAudioData(buf.slice(0));
+      duration = audioBuffer.duration;
+      const track = {
+        id: uid(),
+        name: "Take " + (currentProject.tracks.length + 1),
+        blob: blob,
+        duration: duration,
+        volume: 1,
+        muted: false
+      };
+      decodedCache.set(track.id, audioBuffer);
+      currentProject.tracks.push(track);
+      await saveCurrentProject();
+      renderProject();
+      showStatus("Track saved.", 1600);
+    } catch (err) {
+      showStatus("Couldn't process that recording — try again.", 2800);
+      renderTracks();
     }
   }
 
-  function sendLocalNotification(title, body) {
-    if (Notification.permission === 'granted' && localStorage.getItem('notifEnabled')) {
-      new Notification('shīru\'s corner — ' + title, {
-        body: (body || '').substring(0, 80) + ((body || '').length > 80 ? '…' : ''),
+  async function deleteTrack(id){
+    currentProject.tracks = currentProject.tracks.filter(t => t.id !== id);
+    decodedCache.delete(id);
+    await saveCurrentProject();
+    renderProject();
+  }
+
+  // ---------- decoding ----------
+  async function ensureDecoded(track){
+    if (decodedCache.has(track.id)) return decodedCache.get(track.id);
+    const buf = await track.blob.arrayBuffer();
+    const audioBuffer = await getAudioCtx().decodeAudioData(buf.slice(0));
+    decodedCache.set(track.id, audioBuffer);
+    return audioBuffer;
+  }
+
+  // ---------- playback ----------
+  function stopAllPlayback(){
+    activeSources.forEach(s => { try { s.stop(); } catch(e){} });
+    activeSources = [];
+    clearInterval(playAllTimer);
+    playAllTimer = null;
+    playAllBtn.classList.remove("on");
+    playAllBtn.textContent = "▶ Play all";
+    stopBtn.disabled = true;
+    playAllBtn.disabled = currentProject.tracks.length === 0;
+    timeReadout.textContent = "0:00";
+    soloSingleTrackId = null;
+    document.querySelectorAll(".ctrl-btn.play.playing").forEach(b => {
+      b.classList.remove("playing");
+      b.innerHTML = svgPlay();
+    });
+  }
+
+  async function playTracksInternal(tracks, opts){
+    opts = opts || {};
+    const ctx = getAudioCtx();
+    const startAt = ctx.currentTime + 0.05;
+    let maxDur = 0;
+
+    for (const t of tracks) {
+      if (!opts.forMonitoring && t.muted) continue;
+      let buffer;
+      try { buffer = await ensureDecoded(t); } catch (e) { continue; }
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      const gain = ctx.createGain();
+      gain.gain.value = opts.forMonitoring ? (t.muted ? 0 : t.volume) : t.volume;
+      src.connect(gain).connect(ctx.destination);
+      src.start(startAt);
+      activeSources.push(src);
+      maxDur = Math.max(maxDur, buffer.duration);
+    }
+    return maxDur;
+  }
+
+  async function playAll(){
+    if (!currentProject.tracks.length) return;
+    stopAllPlayback();
+    const dur = await playTracksInternal(currentProject.tracks, {});
+    playAllBtn.classList.add("on");
+    playAllBtn.textContent = "● Playing";
+    stopBtn.disabled = false;
+    const startedAt = performance.now();
+    playAllTimer = setInterval(() => {
+      const elapsed = (performance.now() - startedAt) / 1000;
+      timeReadout.textContent = fmtTime(elapsed);
+      if (elapsed >= dur) stopAllPlayback();
+    }, 200);
+  }
+
+  async function toggleSoloPlay(trackId, btnEl){
+    const isPlayingThis = soloSingleTrackId === trackId;
+    stopAllPlayback();
+    if (isPlayingThis) return;
+
+    const t = currentProject.tracks.find(x => x.id === trackId);
+    if (!t) return;
+    soloSingleTrackId = trackId;
+    btnEl.classList.add("playing");
+    btnEl.innerHTML = svgStop();
+    stopBtn.disabled = false;
+
+    const dur = await playTracksInternal([t], { forMonitoring: true });
+    const startedAt = performance.now();
+    playAllTimer = setInterval(() => {
+      const elapsed = (performance.now() - startedAt) / 1000;
+      timeReadout.textContent = fmtTime(elapsed);
+      if (elapsed >= dur) stopAllPlayback();
+    }, 200);
+  }
+
+  function updateTransportState(){
+    playAllBtn.disabled = currentProject.tracks.length === 0;
+  }
+
+  // ---------- projects sheet ----------
+  const overlay = document.getElementById("projOverlay");
+  const projListEl = document.getElementById("projList");
+
+  async function openProjectsSheet(){
+    const all = (await idbGetAll()).sort((a,b) => b.createdAt - a.createdAt);
+    projListEl.innerHTML = "";
+    if (!all.length) {
+      projListEl.innerHTML = '<div class="hint">No sessions yet.</div>';
+    }
+    all.forEach(p => {
+      const row = document.createElement("div");
+      row.className = "proj-row";
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "p-name";
+      nameSpan.textContent = p.name + (p.id === currentProject.id ? "  ·  current" : "");
+      nameSpan.addEventListener("click", async () => {
+        overlay.classList.remove("show");
+        stopAllPlayback();
+        if (p.id !== currentProject.id) await loadProject(p.id);
       });
-    }
+      const meta = document.createElement("span");
+      meta.className = "p-meta";
+      meta.textContent = p.tracks.length + " trk";
+      const del = document.createElement("button");
+      del.className = "p-del";
+      del.textContent = "×";
+      del.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (all.length === 1) { showStatus("You need at least one session.", 2200); return; }
+        await idbDelete(p.id);
+        if (p.id === currentProject.id) {
+          const remaining = (await idbGetAll()).sort((a,b) => b.createdAt - a.createdAt);
+          currentProject = remaining[0];
+          localStorage.setItem("spool-last-project", currentProject.id);
+          decodedCache.clear();
+          renderProject();
+        }
+        openProjectsSheet();
+      });
+      row.appendChild(nameSpan);
+      row.appendChild(meta);
+      row.appendChild(del);
+      projListEl.appendChild(row);
+    });
+    overlay.classList.add("show");
   }
 
-  function updateNotifyBtn() {
-    const btn = document.getElementById('notifyBtn');
-    const on  = Notification.permission === 'granted' && localStorage.getItem('notifEnabled');
-    btn.textContent = on ? '✦ notifications on — click to disable' : '✦ notify me when something new appears';
-    btn.classList.toggle('subscribed', !!on);
-  }
+  document.getElementById("projectsBtn").addEventListener("click", openProjectsSheet);
+  document.getElementById("closeSheet").addEventListener("click", () => overlay.classList.remove("show"));
+  document.getElementById("newProjBtn").addEventListener("click", async () => {
+    overlay.classList.remove("show");
+    stopAllPlayback();
+    await createProject("Untitled session");
+  });
 
-  // ── UTILS ─────────────────────────────────────
-  function esc(str) {
-    return String(str || '')
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
+  projNameEl.addEventListener("change", () => {
+    currentProject.name = projNameEl.value || "Untitled session";
+    saveCurrentProject();
+  });
 
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2800);
-  }
+  playAllBtn.addEventListener("click", () => {
+    if (playAllBtn.classList.contains("on") || soloSingleTrackId) { stopAllPlayback(); }
+    else { playAll(); }
+  });
+  stopBtn.addEventListener("click", () => {
+    stopAllPlayback();
+    if (recordingTrackId) stopRecording();
+  });
 
-  init();
+  window.addEventListener("beforeunload", () => {
+    if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+  });
+
+  initApp();
+})();
 </script>
 </body>
 </html>
