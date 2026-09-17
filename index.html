@@ -81,6 +81,8 @@
     padding: 7px 12px;
     border-radius: var(--radius);
     cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .proj-btn:active { background: var(--panel-raised); }
 
@@ -103,7 +105,8 @@
     font-family: 'Oswald', sans-serif;
     font-weight: 500;
     font-size: 17px;
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     outline: none;
   }
   .proj-meta {
@@ -446,6 +449,7 @@
   <div class="proj-title">
     <input id="projName" spellcheck="false" placeholder="Untitled session">
     <span class="proj-meta" id="trackCount">0 tracks</span>
+    <button class="proj-btn" id="exportMixBtn" title="Export the full mix as a WAV file">⇩ Mix</button>
   </div>
 
   <main id="trackList"></main>
@@ -740,6 +744,12 @@
     editBtn.title = "Crop / edit";
     editBtn.addEventListener("click", () => openEditSheet(t.id));
 
+    const exportBtn = document.createElement("button");
+    exportBtn.className = "ctrl-btn export";
+    exportBtn.innerHTML = svgDownload();
+    exportBtn.title = "Export this track";
+    exportBtn.addEventListener("click", () => exportTrack(t));
+
     const delBtn = document.createElement("button");
     delBtn.className = "ctrl-btn del";
     delBtn.innerHTML = svgTrash();
@@ -748,6 +758,7 @@
     controls.appendChild(playBtn);
     controls.appendChild(muteBtn);
     controls.appendChild(editBtn);
+    controls.appendChild(exportBtn);
     controls.appendChild(delBtn);
 
     const volRow = document.createElement("div");
@@ -780,6 +791,7 @@
   function svgMuted(){ return '<svg width="15" height="15" viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/><line x1="16" y1="9" x2="22" y2="15" stroke="currentColor" stroke-width="2"/><line x1="22" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="2"/></svg>'; }
   function svgTrash(){ return '<svg width="14" height="14" viewBox="0 0 24 24"><path d="M6 7h12M9 7V4h6v3M7 7l1 13h8l1-13" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
   function svgEdit(){ return '<svg width="14" height="14" viewBox="0 0 24 24"><path d="M4 20l4.3-.9L19.1 8.3a1.5 1.5 0 000-2.1l-1.3-1.3a1.5 1.5 0 00-2.1 0L4.9 15.7 4 20z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/></svg>'; }
+  function svgDownload(){ return '<svg width="14" height="14" viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
   function svgDot(){ return '<svg class="dotsvg" width="12" height="12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>'; }
 
   // ---------- recording ----------
@@ -1229,6 +1241,106 @@
   function writeStr(view, offset, str){
     for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
   }
+
+  // ---------- exporting ----------
+  function sanitizeFilename(name){
+    return (name || "track").replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 80) || "track";
+  }
+
+  function guessExtension(blob){
+    const type = (blob.type || "").toLowerCase();
+    if (type.includes("wav")) return "wav";
+    if (type.includes("webm")) return "webm";
+    if (type.includes("mp4") || type.includes("m4a")) return "m4a";
+    if (type.includes("ogg")) return "ogg";
+    if (type.includes("mpeg") || type.includes("mp3")) return "mp3";
+    return "webm";
+  }
+
+  // Saves a Blob to the viewer's device. Uses the Claude artifact "downloads"
+  // capability when running inside claude.ai; falls back to a plain browser
+  // download (e.g. when this page is hosted elsewhere, like GitHub Pages).
+  async function saveFile(filename, blob){
+    if (window.claude && typeof window.claude.use === "function") {
+      try {
+        const downloads = await window.claude.use("downloads");
+        if (downloads) {
+          try {
+            await downloads.save({ filename, data: blob });
+            showStatus("Saved " + filename, 2000);
+            return;
+          } catch (err) {
+            if (err && err.code === "declined") return;
+            showStatus("Couldn't save that file here.", 2600);
+            return;
+          }
+        }
+      } catch (e) {
+        // fall through to the plain browser download below
+      }
+    }
+
+    try {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      showStatus("Downloading " + filename, 1800);
+    } catch (e2) {
+      showStatus("Couldn't export this file.", 2600);
+    }
+  }
+
+  async function exportTrack(t){
+    const ext = guessExtension(t.blob);
+    const filename = sanitizeFilename(t.name) + "." + ext;
+    await saveFile(filename, t.blob);
+  }
+
+  async function exportMix(){
+    if (!currentProject.tracks.length) { showStatus("No tracks to export yet.", 2200); return; }
+    stopAllPlayback();
+    showStatus("Rendering mix…", 3000);
+
+    try {
+      const included = [];
+      let maxDur = 0, maxChannels = 1;
+      for (const t of currentProject.tracks) {
+        if (t.muted) continue;
+        const buf = await ensureDecoded(t);
+        included.push({ buf, volume: t.volume });
+        maxDur = Math.max(maxDur, buf.duration);
+        maxChannels = Math.max(maxChannels, buf.numberOfChannels);
+      }
+      if (!included.length) { showStatus("Every track is muted — nothing to export.", 2600); return; }
+
+      const sampleRate = Math.max.apply(null, included.map(b => b.buf.sampleRate));
+      const frameCount = Math.max(1, Math.ceil(maxDur * sampleRate) + 1);
+      const offlineCtx = new OfflineAudioContext(maxChannels, frameCount, sampleRate);
+
+      included.forEach(({ buf, volume }) => {
+        const src = offlineCtx.createBufferSource();
+        src.buffer = buf;
+        const gain = offlineCtx.createGain();
+        gain.gain.value = volume;
+        src.connect(gain).connect(offlineCtx.destination);
+        src.start(0);
+      });
+
+      const rendered = await offlineCtx.startRendering();
+      const wavBlob = encodeWav(rendered);
+      const filename = sanitizeFilename(currentProject.name || "mix") + " - mix.wav";
+      await saveFile(filename, wavBlob);
+    } catch (err) {
+      showStatus("Couldn't render the mix.", 2800);
+    }
+  }
+
+  document.getElementById("exportMixBtn").addEventListener("click", exportMix);
 
   // ---------- projects sheet ----------
   const overlay = document.getElementById("projOverlay");
